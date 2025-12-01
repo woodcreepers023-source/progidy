@@ -29,6 +29,7 @@ def send_discord_message(message: str):
 # Only Waterlord as the field/world boss
 # Interval is in minutes; we allow decimals.
 # 20 minutes 10 seconds = 20 + 10/60 = 20.1666667 minutes
+# 20 minutes 10 seconds = 20 + 10/60 = 20.1666667 minutes
 default_boss_data = [
     ("Waterlord", 20.1666667, "2025-09-20 08:00 AM"),
 ]
@@ -529,3 +530,4 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
+
