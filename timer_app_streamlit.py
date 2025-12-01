@@ -28,7 +28,7 @@ def send_discord_message(message: str):
 # ------------------- Default Boss Data -------------------
 # Only Waterlord as the field/world boss
 default_boss_data = [
-    ("Waterlord", 2880, "2025-09-20 08:00 AM"),  # 2880 minutes = 48 hours (change if needed)
+    ("Waterlord", 2880, "2025-09-20 08:00 AM"),
 ]
 
 
@@ -505,4 +505,5 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
+
 
