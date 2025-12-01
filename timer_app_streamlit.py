@@ -27,8 +27,6 @@ def send_discord_message(message: str):
 
 # ------------------- Default Boss Data -------------------
 # Only Waterlord as the field/world boss
-# Interval is in minutes; we allow decimals.
-# 20 minutes 10 seconds = 20 + 10/60 = 20.1666667 minutes
 # 20 minutes 10 seconds = 20 + 10/60 = 20.1666667 minutes
 default_boss_data = [
     ("Waterlord", 20.1666667, "2025-09-20 08:00 AM"),
@@ -66,19 +64,30 @@ def load_boss_data():
                 )
             data = normalized
 
-        # Ensure elements are tuple/list-like of length 3
+        # Ensure elements are tuple/list-like of length 3 and cast interval to float
         cleaned = []
         for entry in data:
             if isinstance(entry, (list, tuple)) and len(entry) == 3:
-                cleaned.append((entry[0], entry[1], entry[2]))
+                name, interval_minutes, last_time_str = entry
+                try:
+                    interval_minutes = float(interval_minutes)
+                except (TypeError, ValueError):
+                    interval_minutes = 20.1666667
+                cleaned.append((name, interval_minutes, last_time_str))
         data = cleaned
 
-    # Keep ONLY Waterlord from any existing data
-    data = [entry for entry in data if entry[0] == "Waterlord"]
+    # Always keep ONLY Waterlord
+    FIXED_INTERVAL_MINUTES = 20.1666667  # 20m 10s
+    waterlords = [entry for entry in data if entry[0] == "Waterlord"]
 
-    # If no Waterlord exists, fall back to default
-    if not data:
-        data = default_boss_data.copy()
+    if waterlords:
+        # Keep last_time_str from file, override interval to fixed value
+        name, _old_interval, last_time_str = waterlords[0]
+        data = [(name, FIXED_INTERVAL_MINUTES, last_time_str)]
+    else:
+        # Fallback to default, but still enforce fixed interval
+        name, _old_interval, last_time_str = default_boss_data[0]
+        data = [(name, FIXED_INTERVAL_MINUTES, last_time_str)]
 
     # Save cleaned data back to JSON
     save_boss_data(data)
@@ -268,7 +277,6 @@ def next_boss_banner(timers_list):
         cd_color = "red"
     elif remaining <= 300:
         cd_color = "orange"
-        # lime green
     else:
         cd_color = "limegreen"
 
@@ -344,10 +352,10 @@ def display_boss_table_sorted(timers_list):
     # Build colored countdown values
     countdown_cells = []
     for t in timers_sorted:
-        secs = t.countdown().total_seconds()
-        if secs <= 60:
+        secs_left = t.countdown().total_seconds()
+        if secs_left <= 60:
             color = "red"
-        elif secs <= 300:
+        elif secs_left <= 300:
             color = "orange"
         else:
             color = "green"
@@ -355,16 +363,26 @@ def display_boss_table_sorted(timers_list):
             f"<span style='color:{color}'>{t.format_countdown()}</span>"
         )
 
+    # Human-readable interval like "20m 10s"
+    interval_labels = []
+    for t in timers_sorted:
+        total_secs = t.interval
+        mins = total_secs // 60
+        secs = total_secs % 60
+        if secs > 0:
+            interval_labels.append(f"{mins}m {secs:02}s")
+        else:
+            interval_labels.append(f"{mins}m")
+
     data = {
         "Boss Name": [t.name for t in timers_sorted],
-        "Interval (min)": [t.interval_minutes for t in timers_sorted],
+        "Interval": interval_labels,
 
         # numeric date + 24-hour time
         "Last Spawn": [
             t.last_time.strftime("%Y/%m/%d - %H:%M") for t in timers_sorted
         ],
 
-        # "Next Spawn Date" removed
         "Next Spawn Time": [t.next_time.strftime("%I:%M %p") for t in timers_sorted],
         "Countdown": countdown_cells,
     }
@@ -530,4 +548,3 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
-
