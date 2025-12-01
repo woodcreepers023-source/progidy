@@ -9,7 +9,7 @@ from pathlib import Path
 
 # ------------------- Config -------------------
 MANILA = ZoneInfo("Asia/Manila")
-DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_HERE"  # <-- put your webhook here
+DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_HERE"  # <-- put your Discord webhook URL here
 DATA_FILE = Path("boss_timers.json")
 HISTORY_FILE = Path("boss_history.json")
 ADMIN_PASSWORD = "bestgame"
@@ -27,8 +27,10 @@ def send_discord_message(message: str):
 
 # ------------------- Default Boss Data -------------------
 # Only Waterlord as the field/world boss
+# Interval is in minutes; we allow decimals.
+# 20 minutes 10 seconds = 20 + 10/60 = 20.1666667 minutes
 default_boss_data = [
-    ("Waterlord", 2880, "2025-09-20 08:00 AM"),
+    ("Waterlord", 20.1666667, "2025-09-20 08:00 AM"),
 ]
 
 
@@ -51,7 +53,7 @@ def load_boss_data():
     data = _safe_load_json(DATA_FILE, None)
 
     if data is None:
-        # First run: use default data and save it
+        # First run: use default data
         data = default_boss_data.copy()
     else:
         # If JSON was saved as list of dicts accidentally, normalize it
@@ -70,7 +72,7 @@ def load_boss_data():
                 cleaned.append((entry[0], entry[1], entry[2]))
         data = cleaned
 
-    # 🔹 Keep ONLY Waterlord from any existing data
+    # Keep ONLY Waterlord from any existing data
     data = [entry for entry in data if entry[0] == "Waterlord"]
 
     # If no Waterlord exists, fall back to default
@@ -105,7 +107,7 @@ def log_edit(boss_name, old_time, new_time):
     with HISTORY_FILE.open("w", encoding="utf-8") as f:
         json.dump(history, f, indent=4, ensure_ascii=False)
 
-    # Send to Discord so guild can see who edited what
+    # Generic edit log to Discord
     send_discord_message(
         f"🛠 **{boss_name}** time updated by **{edited_by}**\n"
         f"Old: `{old_time}` → New: `{new_time}` (Manila time)"
@@ -116,8 +118,11 @@ def log_edit(boss_name, old_time, new_time):
 class TimerEntry:
     def __init__(self, name, interval_minutes, last_time_str):
         self.name = name
-        self.interval_minutes = interval_minutes
-        self.interval = interval_minutes * 60
+        # Allow decimals in minutes (e.g. 20.1666667)
+        self.interval_minutes = float(interval_minutes)
+        # Convert minutes (possibly decimal) to seconds
+        self.interval = int(self.interval_minutes * 60)
+
         parsed_time = datetime.strptime(last_time_str, "%Y-%m-%d %I:%M %p").replace(
             tzinfo=MANILA
         )
@@ -185,9 +190,9 @@ if not st.session_state.auth:
         st.session_state.username = username.strip()
         st.success(f"✅ Access granted for {st.session_state.username}")
 
-# ------------------- Weekly Boss Data -------------------
+# ------------------- Weekly Boss Data (Capricorn only) -------------------
 weekly_boss_data = [
-    ("Capricorn", ["Sunday 20:00"]),   # <-- You can change the day/time
+    ("Capricorn", ["Sunday 20:00"]),  # Change day/time here if needed
 ]
 
 
@@ -262,6 +267,7 @@ def next_boss_banner(timers_list):
         cd_color = "red"
     elif remaining <= 300:
         cd_color = "orange"
+        # lime green
     else:
         cd_color = "limegreen"
 
@@ -357,7 +363,7 @@ def display_boss_table_sorted(timers_list):
             t.last_time.strftime("%Y/%m/%d - %H:%M") for t in timers_sorted
         ],
 
-        # ❌ Removed "Next Spawn Date" column
+        # "Next Spawn Date" removed
         "Next Spawn Time": [t.next_time.strftime("%I:%M %p") for t in timers_sorted],
         "Countdown": countdown_cells,
     }
@@ -442,6 +448,15 @@ if st.session_state.auth:
                     step=60,
                 )
 
+                # Extra: Killer name for Waterlord Discord drop message
+                killer_name = ""
+                if timer.name == "Waterlord":
+                    killer_name = st.text_input(
+                        "Killer name (for Discord message)",
+                        key=f"{timer.name}_killer_{i}",
+                        placeholder="Type killer's name here...",
+                    )
+
                 if st.button(f"Save {timer.name}", key=f"save_{timer.name}_{i}"):
                     old_time_str = timer.last_time.strftime("%Y-%m-%d %I:%M %p")
 
@@ -467,12 +482,21 @@ if st.session_state.auth:
                         ]
                     )
 
-                    # Log edit
+                    # Log edit (generic log)
                     log_edit(
                         timer.name,
                         old_time_str,
                         updated_last_time.strftime("%Y-%m-%d %I:%M %p"),
                     )
+
+                    # Special Discord message for Waterlord drop
+                    if timer.name == "Waterlord":
+                        name_part = killer_name.strip() or "Unknown Hero"
+                        drop_msg = (
+                            f"[ProdigyCO] CONGRATS A rare CleanWater has dropped "
+                            f"from the WaterDevil killed by {name_part}"
+                        )
+                        send_discord_message(drop_msg)
 
                     st.success(
                         f"✅ {timer.name} updated! Next: {updated_next_time.strftime('%Y-%m-%d %I:%M %p')}"
@@ -505,5 +529,3 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
-
-
