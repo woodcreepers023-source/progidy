@@ -12,7 +12,7 @@ MANILA = ZoneInfo("Asia/Manila")
 DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_HERE"  # <-- put your Discord webhook URL here
 DATA_FILE = Path("boss_timers.json")
 HISTORY_FILE = Path("boss_history.json")
-ADMIN_PASSWORD = "bestgame"
+ADMIN_PASSWORD = "1"
 
 
 def send_discord_message(message: str):
@@ -548,3 +548,4 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
+
