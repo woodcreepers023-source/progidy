@@ -26,29 +26,9 @@ def send_discord_message(message: str):
 
 
 # ------------------- Default Boss Data -------------------
+# Only Waterlord as the field/world boss
 default_boss_data = [
-    ("Venatus", 600, "2025-09-19 12:31 PM"),
-    ("Viorent", 600, "2025-09-19 12:32 PM"),
-    ("Ego", 1260, "2025-09-19 04:32 PM"),
-    ("Livera", 1440, "2025-09-19 04:36 PM"),
-    ("Araneo", 1440, "2025-09-19 04:33 PM"),
-    ("Undomiel", 1440, "2025-09-19 04:42 PM"),
-    ("Lady Dalia", 1080, "2025-09-19 05:58 AM"),
-    ("General Aquleus", 1740, "2025-09-18 09:45 PM"),
-    ("Amentis", 1740, "2025-09-18 09:42 PM"),
-    ("Baron Braudmore", 1920, "2025-09-19 12:37 AM"),
-    ("Wannitas", 2880, "2025-09-19 04:46 PM"),
-    ("Metus", 2880, "2025-09-18 06:53 AM"),
-    ("Duplican", 2880, "2025-09-19 04:40 PM"),
-    ("Shuliar", 2100, "2025-09-19 03:49 AM"),
-    ("Gareth", 1920, "2025-09-19 12:38 AM"),
-    ("Titore", 2220, "2025-09-19 04:36 PM"),
-    ("Larba", 2100, "2025-09-19 03:55 AM"),
-    ("Catena", 2100, "2025-09-19 04:12 AM"),
-    ("Secreta", 3720, "2025-09-17 05:15 PM"),
-    ("Ordo", 3720, "2025-09-17 05:07 PM"),
-    ("Asta", 3720, "2025-09-17 04:59 PM"),
-    ("Supore", 3720, "2025-09-20 07:15 AM"),
+    ("Waterlord", 2880, "2025-09-20 08:00 AM"),  # 2880 minutes = 48 hours (change if needed)
 ]
 
 
@@ -73,7 +53,6 @@ def load_boss_data():
     if data is None:
         # First run: use default data and save it
         data = default_boss_data.copy()
-        save_boss_data(data)
     else:
         # If JSON was saved as list of dicts accidentally, normalize it
         if data and isinstance(data[0], dict):
@@ -83,12 +62,23 @@ def load_boss_data():
                     (d["name"], d["interval_minutes"], d["last_time_str"])
                 )
             data = normalized
-            save_boss_data(data)
 
-    # Ensure Supore always exists
-    if not any(boss[0] == "Supore" for boss in data):
-        data.append(("Supore", 3720, "2025-09-20 07:15 AM"))
-        save_boss_data(data)
+        # Ensure elements are tuple/list-like of length 3
+        cleaned = []
+        for entry in data:
+            if isinstance(entry, (list, tuple)) and len(entry) == 3:
+                cleaned.append((entry[0], entry[1], entry[2]))
+        data = cleaned
+
+    # 🔹 Keep ONLY Waterlord from any existing data
+    data = [entry for entry in data if entry[0] == "Waterlord"]
+
+    # If no Waterlord exists, fall back to default
+    if not data:
+        data = default_boss_data.copy()
+
+    # Save cleaned data back to JSON
+    save_boss_data(data)
 
     return data
 
@@ -243,7 +233,7 @@ def next_boss_banner(timers_list):
     for t in timers_list:
         t.update_next()
 
-    # Soonest field boss
+    # Soonest field boss (only Waterlord now)
     field_next = min(timers_list, key=lambda x: x.countdown())
     field_cd = field_next.countdown()
 
@@ -376,9 +366,7 @@ def display_boss_table_sorted(timers_list):
             t.last_time.strftime("%Y/%m/%d - %H:%M") for t in timers_sorted
         ],
 
-        "Next Spawn Date": [
-            t.next_time.strftime("%b %d, %Y (%a)") for t in timers_sorted
-        ],
+        # ❌ Removed "Next Spawn Date" column
         "Next Spawn Time": [t.next_time.strftime("%I:%M %p") for t in timers_sorted],
         "Countdown": countdown_cells,
     }
@@ -453,17 +441,17 @@ if st.session_state.auth:
 
                 new_date = st.date_input(
                     f"{timer.name} Last Date",
-                    value=today,                     # <-- TODAY
-                    key=f"{timer.name}_last_date",
+                    value=today,
+                    key=f"{timer.name}_last_date_{i}",
                 )
                 new_time = st.time_input(
                     f"{timer.name} Last Time",
-                    value=stored_time,               # <-- STORED TIME
-                    key=f"{timer.name}_last_time",
+                    value=stored_time,
+                    key=f"{timer.name}_last_time_{i}",
                     step=60,
                 )
 
-                if st.button(f"Save {timer.name}", key=f"save_{timer.name}"):
+                if st.button(f"Save {timer.name}", key=f"save_{timer.name}_{i}"):
                     old_time_str = timer.last_time.strftime("%Y-%m-%d %I:%M %p")
 
                     updated_last_time = datetime.combine(new_date, new_time).replace(
@@ -505,35 +493,24 @@ if st.session_state.auth:
     with tab_selection[2]:
         st.subheader("Edit History")
 
-        if HISTORY_FILE.exists():
-            try:
-                with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                    history = json.load(f)
-            except Exception:
-                history = []
+        history = _safe_load_json(HISTORY_FILE, [])
+        if history:
+            df_history = pd.DataFrame(history)
 
-            if history:
-                df_history = pd.DataFrame(history)
+            # Convert edited_at string -> real datetime for correct sorting
+            df_history["edited_at_dt"] = pd.to_datetime(
+                df_history["edited_at"],
+                format="%Y-%m-%d %I:%M %p",
+                errors="coerce",
+            )
 
-                # Convert edited_at string -> real datetime for correct sorting
-                df_history["edited_at_dt"] = pd.to_datetime(
-                    df_history["edited_at"],
-                    format="%Y-%m-%d %I:%M %p",
-                    errors="coerce",
-                )
+            # Sort newest → oldest
+            df_history = (
+                df_history.sort_values("edited_at_dt", ascending=False)
+                .drop(columns=["edited_at_dt"])
+                .reset_index(drop=True)
+            )
 
-                # Sort newest → oldest
-                df_history = (
-                    df_history.sort_values("edited_at_dt", ascending=False)
-                    .drop(columns=["edited_at_dt"])
-                    .reset_index(drop=True)
-                )
-
-                st.dataframe(df_history, use_container_width=True)
-            else:
-                st.info("No edits yet.")
+            st.dataframe(df_history, use_container_width=True)
         else:
-            st.info("No edit history yet.")
-
-
-
+            st.info("No edits yet.")
