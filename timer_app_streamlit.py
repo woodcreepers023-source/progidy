@@ -187,16 +187,7 @@ if not st.session_state.auth:
 
 # ------------------- Weekly Boss Data -------------------
 weekly_boss_data = [
-    ("Clemantis", ["Monday 11:30", "Thursday 19:00"]),
-    ("Saphirus", ["Sunday 17:00", "Tuesday 11:30"]),
-    ("Neutro", ["Tuesday 19:00", "Thursday 11:30"]),
-    ("Thymele", ["Monday 19:00", "Wednesday 11:30"]),
-    ("Milavy", ["Saturday 15:00"]),
-    ("Ringor", ["Saturday 17:00"]),
-    ("Roderick", ["Friday 19:00"]),
-    ("Auraq", ["Friday 22:00", "Wednesday 21:00"]),
-    ("Chaiflock", ["Saturday 22:00"]),
-    ("Benji", ["Sunday 21:00"]),
+    ("Capricorn", ["Sunday 20:00"]),   # <-- You can change the day/time
 ]
 
 
@@ -514,3 +505,4 @@ if st.session_state.auth:
             st.dataframe(df_history, use_container_width=True)
         else:
             st.info("No edits yet.")
+
